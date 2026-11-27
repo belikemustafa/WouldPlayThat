@@ -8,7 +8,7 @@ window.WPT_API = (() => {
   const memCache = new Map();
   const gameIndex = new Map();
 
-  const MAX_CONCURRENT = 3;
+  const MAX_CONCURRENT = 6;
   let activeReqs = 0;
   const reqQueue = [];
 
@@ -317,23 +317,29 @@ window.WPT_API = (() => {
   }
 
   /* ---------- Fetch Helper ---------- */
-  async function fetchJson(url, cacheKey, ttl = CFG.CACHE_TTL_MS) {
+  async function fetchJson(url, cacheKey, ttl = CFG.CACHE_TTL_MS, signal = null) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     if (cacheKey) {
       const cached = readCache(cacheKey);
       if (cached) return cached;
     }
 
     return enqueue(async () => {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
       let lastErr = null;
       for (let attempt = 0; attempt < 2; attempt += 1) {
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const onOuterAbort = () => controller.abort();
+        signal?.addEventListener('abort', onOuterAbort, { once: true });
         try {
           const res = await fetch(url, { signal: controller.signal });
           clearTimeout(timer);
+          signal?.removeEventListener('abort', onOuterAbort);
           if (res.status === 429 || res.status >= 500) {
             lastErr = new Error(`HTTP ${res.status}`);
-            await sleep(500 * (attempt + 1));
+            await sleep(400 * (attempt + 1));
             continue;
           }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -343,8 +349,10 @@ window.WPT_API = (() => {
           return data;
         } catch (err) {
           clearTimeout(timer);
+          signal?.removeEventListener('abort', onOuterAbort);
+          if (signal?.aborted) throw err;
           lastErr = err;
-          if (attempt < 1) await sleep(350);
+          if (attempt < 1) await sleep(280);
         }
       }
       throw lastErr || new Error('Network request failed');
@@ -499,7 +507,7 @@ window.WPT_API = (() => {
     return item;
   }
 
-  async function searchWikipediaGames(query, limit = 18) {
+  async function searchWikipediaGames(query, limit = 18, signal = null) {
     const clean = String(query || '').trim();
     if (!clean) return [];
     const gsr = /\bvideo game\b/i.test(clean) ? clean : `${clean} "video game"`;
@@ -521,12 +529,45 @@ window.WPT_API = (() => {
     url.searchParams.set('origin', '*');
 
     try {
-      const data = await fetchJson(url.toString(), `wiki_search_${gsr.toLowerCase()}`, CFG.CACHE_TTL_MS * 2);
+      const data = await fetchJson(url.toString(), `wiki_search_${gsr.toLowerCase()}`, CFG.CACHE_TTL_MS * 2, signal);
       const pages = Object.values(data?.query?.pages || {}).sort((a, b) => (a.index || 99) - (b.index || 99));
       return pages.filter(isLikelyVideoGamePage).map(normalizeWikiGame);
     } catch {
       return [];
     }
+  }
+
+  async function fetchExactWikiGame(title, signal = null) {
+    const clean = String(title || '').trim();
+    if (!clean || clean.length < 2) return [];
+    const candidates = [`${clean} (video game)`, clean];
+
+    const settled = await Promise.allSettled(
+      candidates.map(async (cand) => {
+        const slug = encodeURIComponent(cand.replace(/\s+/g, '_'));
+        const data = await fetchJson(
+          `${CFG.WIKI_SUMMARY_BASE}${slug}`,
+          `wiki_exact_${cand.toLowerCase()}`,
+          CFG.CACHE_TTL_MS * 4,
+          signal
+        );
+        if (!data || data.type === 'disambiguation') return null;
+        const page = {
+          title: data.title || cand,
+          pageid: data.pageid,
+          description: data.description || '',
+          extract: data.extract || '',
+          thumbnail: data.thumbnail,
+          fullurl: data.content_urls?.desktop?.page || ''
+        };
+        return isLikelyVideoGamePage(page) ? normalizeWikiGame(page) : null;
+      })
+    );
+
+    const hits = settled
+      .filter((r) => r.status === 'fulfilled' && r.value)
+      .map((r) => r.value);
+    return dedupeGames(hits);
   }
 
   /* ---------- Universal Sorter (Never Hides Unrated Games!) ---------- */
@@ -594,7 +635,7 @@ window.WPT_API = (() => {
     return getCuratedVault().filter((g) => g.featured).slice(0, 6);
   }
 
-  async function fetchLiveDeals({ page = 0, pageSize = 24, metacritic = 80, steamRating = 80, sortBy = 'Metacritic', title = '', upperPrice = null, onSale = false, storeID = '1' } = {}) {
+  async function fetchLiveDeals({ page = 0, pageSize = 24, metacritic = 80, steamRating = 80, sortBy = 'Metacritic', title = '', upperPrice = null, onSale = false, storeID = '1', signal = null } = {}) {
     const url = new URL(`${CFG.CHEAPSHARK_BASE}/deals`);
     if (storeID) url.searchParams.set('storeID', String(storeID));
     url.searchParams.set('pageNumber', String(page));
@@ -606,7 +647,7 @@ window.WPT_API = (() => {
     if (upperPrice !== null && upperPrice !== undefined) url.searchParams.set('upperPrice', String(upperPrice));
     if (onSale) url.searchParams.set('onSale', '1');
 
-    const rows = await fetchJson(url.toString(), `cs_deals_${url.searchParams.toString()}`);
+    const rows = await fetchJson(url.toString(), `cs_deals_${url.searchParams.toString()}`, CFG.CACHE_TTL_MS, signal);
     if (!Array.isArray(rows)) return [];
     return dedupeGames(rows.map(normalizeCheapSharkDeal));
   }
@@ -638,7 +679,7 @@ window.WPT_API = (() => {
     return getCuratedVault().filter(col.filter).slice(0, 14);
   }
 
-  /* ---------- 3-Engine Universal Online Game Search ---------- */
+  /* ---------- 4-Source Progressive Streaming Universal Online Game Search ---------- */
   const SEARCH_ALIASES = {
     gta: 'grand theft auto',
     gtav: 'grand theft auto v',
@@ -649,18 +690,91 @@ window.WPT_API = (() => {
     botw: 'breath of the wild',
     totk: 'tears of the kingdom',
     tlou: 'the last of us',
+    tlou2: 'the last of us part ii',
     gow: 'god of war',
     cod: 'call of duty',
+    mw3: 'call of duty modern warfare iii',
+    bo6: 'call of duty black ops 6',
+    bo3: 'call of duty black ops iii',
+    bf1: 'battlefield 1',
     bg3: "baldur's gate 3",
     cs2: 'counter-strike 2',
     csgo: 'counter-strike',
-    ff7: 'final fantasy vii',
-    mgs: 'metal gear solid',
-    re4: 'resident evil 4',
-    wow: 'world of warcraft',
+    val: 'valorant',
+    ow: 'overwatch 2',
+    ow2: 'overwatch 2',
+    r6: 'rainbow six siege',
+    siege: 'rainbow six siege',
+    tarkov: 'escape from tarkov',
+    pubg: 'pubg battlegrounds',
+    apex: 'apex legends',
+    fn: 'fortnite',
+    rl: 'rocket league',
+    tf2: 'team fortress 2',
+    l4d2: 'left 4 dead 2',
+    hl2: 'half-life 2',
+    fc25: 'ea sports fc 25',
+    fifa: 'ea sports fc',
+    dota: 'dota 2',
+    dota2: 'dota 2',
     lol: 'league of legends',
+    wow: 'world of warcraft',
+    eso: 'the elder scrolls online',
+    osrs: 'old school runescape',
+    ff7: 'final fantasy vii',
+    ff14: 'final fantasy xiv',
+    ffxiv: 'final fantasy xiv',
+    ff16: 'final fantasy xvi',
+    ffxvi: 'final fantasy xvi',
+    mk8: 'mario kart 8 deluxe',
+    ssbu: 'super smash bros ultimate',
+    smash: 'super smash bros ultimate',
+    acnh: 'animal crossing new horizons',
+    poe: 'path of exile',
+    poe2: 'path of exile 2',
+    civ6: 'civilization vi',
+    civ7: 'civilization vii',
+    fh5: 'forza horizon 5',
+    gt7: 'gran turismo 7',
+    mgs: 'metal gear solid',
+    re2: 'resident evil 2',
+    re3: 'resident evil 3',
+    re4: 'resident evil 4',
+    re7: 'resident evil 7',
+    re8: 'resident evil village',
+    sh2: 'silent hill 2',
+    ds1: 'dark souls',
+    ds3: 'dark souls iii',
+    er: 'elden ring',
+    cp2077: 'cyberpunk 2077',
+    tw3: 'the witcher 3',
+    fnv: 'fallout new vegas',
+    fo4: 'fallout 4',
+    kcd2: 'kingdom come deliverance ii',
+    wukong: 'black myth wukong',
+    bmw: 'black myth wukong',
+    hzd: 'horizon zero dawn',
+    hfw: 'horizon forbidden west',
+    got: 'ghost of tsushima',
+    sm2: 'spider-man 2',
+    dmc5: 'devil may cry 5',
+    mhw: 'monster hunter world',
+    mhr: 'monster hunter rise',
+    sf6: 'street fighter 6',
+    t8: 'tekken 8',
+    mk1: 'mortal kombat 1',
     mc: 'minecraft',
-    p5: 'persona 5'
+    p3r: 'persona 3 reload',
+    p4g: 'persona 4 golden',
+    p5: 'persona 5',
+    p5r: 'persona 5 royal',
+    kh2: 'kingdom hearts ii',
+    kh3: 'kingdom hearts iii',
+    ac2: "assassin's creed ii",
+    ac4: "assassin's creed iv black flag",
+    destiny2: 'destiny 2',
+    genshin: 'genshin impact',
+    hsr: 'honkai star rail'
   };
 
   function expandQueryAlias(raw) {
@@ -706,15 +820,14 @@ window.WPT_API = (() => {
     return [...items].sort((a, b) => scoreItem(b) - scoreItem(a));
   }
 
-  async function searchGames(query) {
-    const clean = String(query || '').trim();
-    if (!clean) return [];
-    const expanded = expandQueryAlias(clean);
+  function matchLocalCatalog(clean, expanded) {
     const qLower = expanded.toLowerCase();
+    const rawLower = clean.toLowerCase();
     const tokens = qLower.split(/[^a-z0-9]+/).filter((t) => t.length >= 2);
 
-    // Engine 1: Instant Curated Vault matches (fuzzy token matching)
-    const vaultMatches = getCuratedVault().filter((g) => {
+    // Combine Curated Vault + any previously discovered live games already in memory
+    const pool = dedupeGames([...getCuratedVault(), ...gameIndex.values()]);
+    return pool.filter((g) => {
       const hay = [
         g.displayTitle,
         g.studio,
@@ -728,13 +841,52 @@ window.WPT_API = (() => {
       ]
         .join(' ')
         .toLowerCase();
-      return hay.includes(qLower) || (tokens.length > 0 && tokens.every((t) => hay.includes(t)));
+      return (
+        hay.includes(qLower) ||
+        (rawLower && hay.includes(rawLower)) ||
+        (tokens.length > 0 && tokens.every((t) => hay.includes(t)))
+      );
     });
+  }
 
-    // Engine 2A + 2B + Engine 3: Parallel online search across CheapShark Multi-Store & Wikipedia Encyclopedia
+  function getInstantSuggestions(query, limit = 6) {
+    const clean = String(query || '').trim();
+    if (clean.length < 2) return [];
+    const expanded = expandQueryAlias(clean);
+    const localHits = matchLocalCatalog(clean, expanded);
+    return rankSearchResults(localHits, clean, expanded).slice(0, limit);
+  }
+
+  async function searchGames(query, { onPartial = null, signal = null } = {}) {
+    const clean = String(query || '').trim();
+    if (!clean) return [];
+    const expanded = expandQueryAlias(clean);
+    const qLower = expanded.toLowerCase();
+
+    // Engine 1: Instant 0ms local matches (Curated Vault + session-indexed games)
+    let accumulated = matchLocalCatalog(clean, expanded);
+    let pending = 4;
+
+    const emit = () => {
+      if (signal?.aborted) return [];
+      const ranked = rankSearchResults(dedupeGames(accumulated), clean, expanded);
+      if (typeof onPartial === 'function') {
+        onPartial(ranked, { pending, isFinal: pending === 0 });
+      }
+      return ranked;
+    };
+
+    // Emit instant hits immediately so the user sees results in 0ms while live engines stream in
+    if (accumulated.length > 0 && typeof onPartial === 'function') {
+      emit();
+    }
+
+    // Launch all 4 live online engines in parallel and stream each one the moment it settles
     const csGamesUrl = `${CFG.CHEAPSHARK_BASE}/games?title=${encodeURIComponent(expanded)}&limit=40`;
 
-    const [dealsRes, gamesRes, wikiRes] = await Promise.allSettled([
+    const engines = [
+      fetchExactWikiGame(expanded, signal),
+      searchWikipediaGames(expanded, 18, signal),
       fetchLiveDeals({
         page: 0,
         pageSize: 30,
@@ -742,9 +894,10 @@ window.WPT_API = (() => {
         steamRating: 0,
         sortBy: 'Title',
         title: expanded,
-        storeID: '' // Search ALL PC stores (Steam, Epic, GOG, Humble, Fanatical, GMG, etc.)
+        storeID: '', // Search ALL PC stores (Steam, Epic, GOG, Humble, Fanatical, GMG, etc.)
+        signal
       }),
-      fetchJson(csGamesUrl, `cs_games_${qLower}`).then((rows) =>
+      fetchJson(csGamesUrl, `cs_games_${qLower}`, CFG.CACHE_TTL_MS, signal).then((rows) =>
         Array.isArray(rows)
           ? rows.map((r) =>
               normalizeCheapSharkDeal({
@@ -757,16 +910,29 @@ window.WPT_API = (() => {
               })
             )
           : []
-      ),
-      searchWikipediaGames(expanded, 18)
-    ]);
+      )
+    ];
 
-    const liveDeals = dealsRes.status === 'fulfilled' ? dealsRes.value : [];
-    const liveCatalog = gamesRes.status === 'fulfilled' ? gamesRes.value : [];
-    const wikiGames = wikiRes.status === 'fulfilled' ? wikiRes.value : [];
+    await Promise.all(
+      engines.map((p) =>
+        p
+          .then((items) => {
+            if (Array.isArray(items) && items.length) {
+              accumulated = [...accumulated, ...items];
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            pending -= 1;
+            if (!signal?.aborted && (accumulated.length > 0 || pending === 0)) {
+              emit();
+            }
+          })
+      )
+    );
 
-    const merged = dedupeGames([...vaultMatches, ...liveDeals, ...liveCatalog, ...wikiGames]);
-    return rankSearchResults(merged, clean, expanded);
+    if (signal?.aborted) return [];
+    return rankSearchResults(dedupeGames(accumulated), clean, expanded);
   }
 
   /* ---------- Filter Studio Discovery (Curated Vault + Online Expansion) ---------- */
@@ -1076,6 +1242,7 @@ Return ONLY JSON: {"metacritic": number|null, "playerScore": number|null, "award
     fetchCollection,
     hydrateWikiCover,
     fetchGameDetails,
+    getInstantSuggestions,
     searchGames,
     discoverWithFilters,
     aiNaturalLanguageDiscover,

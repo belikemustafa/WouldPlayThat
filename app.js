@@ -18,6 +18,8 @@
     discoverTotalPages: 1,
     discoverMode: 'filter',
     discoverSeq: 0,
+    searchAbortController: null,
+    suggIndex: -1,
     currentResults: [],
     lastQuery: '',
     backlogFilter: 'all',
@@ -109,6 +111,7 @@
   function switchView(viewName, { skipAutoDiscover = false } = {}) {
     state.view = viewName;
     closeAllPopovers();
+    closeSearchSuggestions();
     document.querySelectorAll('.view-section').forEach((el) => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === viewName));
     document.querySelectorAll('.dock-btn').forEach((b) => b.classList.toggle('active', b.dataset.mobileNav === viewName));
@@ -139,9 +142,20 @@
     document.body.classList.toggle('sheet-open', anyOpen && isMobile);
   }
 
-  /* ---------- Home: Swipeable Hero & Collections ---------- */
+  /* ---------- Home: Swipeable Hero & Whole-Tile Collections ---------- */
   function createSkeletonCards(count = 6) {
     return Array.from({ length: count }, () => `<div class="skeleton-card shimmer"></div>`).join('');
+  }
+
+  function syncShelfArrows(row) {
+    if (!row) return;
+    const block = row.closest('.collection-block');
+    if (!block) return;
+    const prevBtn = block.querySelector('[data-shelf-scroll="-1"]');
+    const nextBtn = block.querySelector('[data-shelf-scroll="1"]');
+    const maxScroll = Math.max(0, row.scrollWidth - row.clientWidth);
+    if (prevBtn) prevBtn.disabled = row.scrollLeft <= 4;
+    if (nextBtn) nextBtn.disabled = maxScroll <= 4 || row.scrollLeft >= maxScroll - 4;
   }
 
   async function loadHomeContent() {
@@ -153,6 +167,14 @@
           <div>
             <p class="eyebrow">${col.eyebrow}</p>
             <h2 class="collection-title">${col.title}</h2>
+          </div>
+          <div class="shelf-nav-group">
+            <button type="button" class="shelf-arrow" data-shelf-scroll="-1" data-shelf-target="col-row-${col.id}" aria-label="Previous ${escapeHtml(col.title)} page" disabled>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button type="button" class="shelf-arrow" data-shelf-scroll="1" data-shelf-target="col-row-${col.id}" aria-label="Next ${escapeHtml(col.title)} page">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
           </div>
         </div>
         <div class="collection-row" id="col-row-${col.id}">${createSkeletonCards(6)}</div>
@@ -168,22 +190,35 @@
       $('heroTrack').innerHTML = `<div class="hero-skeleton"><span>Unable to load spotlight (${escapeHtml(err.message)}).</span></div>`;
     }
 
-    for (const col of CFG.COLLECTIONS) {
+    CFG.COLLECTIONS.forEach((col, colIdx) => {
       API.fetchCollection(col)
         .then((items) => {
           const row = $(`col-row-${col.id}`);
           if (!row) return;
           row.innerHTML = items.length
-            ? items.map((item) => createCardHTML(item)).join('')
+            ? items.map((item, idx) => createCardHTML(item, { eager: colIdx === 0 && idx < 6 })).join('')
             : `<div class="empty-state" style="min-width:260px;">No titles available for ${escapeHtml(col.title)}.</div>`;
           attachCoverFallbacks(row);
           hydrateMissingCovers(row, items);
+          syncShelfArrows(row);
+          row.addEventListener('scroll', () => syncShelfArrows(row), { passive: true });
         })
         .catch(() => {
           const row = $(`col-row-${col.id}`);
           if (row) row.innerHTML = `<div class="empty-state" style="min-width:260px;">Unable to load ${escapeHtml(col.title)}.</div>`;
         });
-    }
+    });
+  }
+
+  function preloadNextHeroImage() {
+    if (state.heroItems.length < 2) return;
+    const nextItem = state.heroItems[(state.heroIndex + 1) % state.heroItems.length];
+    if (!nextItem) return;
+    [nextItem.backdropUrl, nextItem.posterUrl].filter(Boolean).forEach((src) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = src;
+    });
   }
 
   function renderHeroSlide() {
@@ -233,6 +268,7 @@
     bar.classList.remove('running');
     void bar.offsetWidth;
     bar.classList.add('running');
+    preloadNextHeroImage();
   }
 
   function stepHero(delta) {
@@ -461,7 +497,7 @@
     });
   }
 
-  function renderDiscoverGrid(items, append = false, metaPrefix = '') {
+  function renderDiscoverGrid(items, append = false, metaPrefix = '', metaSuffix = '') {
     const grid = $('discoverGrid');
 
     if (!append) state.currentResults = items;
@@ -479,20 +515,25 @@
       (state.discoverMode === 'search' || state.discoverMode === 'ai') &&
       state.filters.sort === 'popularity.desc';
     const displayList = API.sortAndSanitize(state.currentResults, state.filters.sort, preserveOrder);
-    $('resultsMeta').textContent = `${metaPrefix}${displayList.length} game${displayList.length === 1 ? '' : 's'}`;
+    $('resultsMeta').textContent = `${metaPrefix}${displayList.length} game${displayList.length === 1 ? '' : 's'}${metaSuffix}`;
 
     if (!displayList.length) {
       grid.innerHTML = `<div class="empty-state">No games match that exact combination. Try switching an <strong>AND</strong> filter to <strong>OR</strong>, or tap an active chip above to remove it.</div>`;
       return;
     }
 
-    grid.innerHTML = displayList.map((item) => createCardHTML(item)).join('');
+    grid.innerHTML = displayList.map((item, idx) => createCardHTML(item, { eager: !append && idx < 6 })).join('');
     attachCoverFallbacks(grid);
     hydrateMissingCovers(grid, displayList);
   }
 
   async function runDiscover(page = 1, append = false) {
     closeAllPopovers();
+    closeSearchSuggestions();
+    if (state.searchAbortController) {
+      state.searchAbortController.abort();
+      state.searchAbortController = null;
+    }
     const seq = ++state.discoverSeq;
     state.discoverMode = 'filter';
     state.discoverPage = page;
@@ -513,9 +554,81 @@
     }
   }
 
+  /* ---------- Instant Type-Ahead Search Suggestions ---------- */
+  function closeSearchSuggestions() {
+    state.suggIndex = -1;
+    const box = $('searchSuggestions');
+    if (box) {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+    }
+  }
+
+  function highlightSuggestion(idx) {
+    const box = $('searchSuggestions');
+    if (!box) return;
+    const items = [...box.querySelectorAll('.search-sugg-item, .search-sugg-footer')];
+    if (!items.length) return;
+    state.suggIndex = Math.max(-1, Math.min(idx, items.length - 1));
+    items.forEach((el, i) => el.classList.toggle('is-active', i === state.suggIndex));
+  }
+
+  function renderSearchSuggestions(query) {
+    const box = $('searchSuggestions');
+    if (!box) return;
+    const clean = String(query || '').trim();
+    if (clean.length < 2) {
+      closeSearchSuggestions();
+      return;
+    }
+
+    const hits = typeof API.getInstantSuggestions === 'function' ? API.getInstantSuggestions(clean, 6) : [];
+    state.suggIndex = -1;
+
+    const rowsHtml = hits
+      .map((item) => {
+        const metaData = serializeBacklogPayload(item);
+        const sub = [item.studio, item.displayYear !== '—' ? item.displayYear : ''].filter(Boolean).join(' · ');
+        const scoreTag = item.hasMetacritic
+          ? `<span class="rating-pill rating-mc">MC ${item.metacritic}</span>`
+          : item.hasPlayerScore
+          ? `<span class="rating-pill rating-user">★ ${item.playerScore.toFixed(1)}</span>`
+          : '';
+        return `
+          <button type="button" class="search-sugg-item" role="option" data-sugg-open="${escapeHtml(item.id)}" data-payload="${metaData}">
+            ${
+              item.posterUrl
+                ? `<img class="search-sugg-thumb" src="${item.posterUrl}" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" />`
+                : `<div class="search-sugg-thumb search-sugg-thumb-fallback" aria-hidden="true">◈</div>`
+            }
+            <div class="search-sugg-meta">
+              <div class="search-sugg-title">${escapeHtml(item.displayTitle)}</div>
+              <div class="search-sugg-sub">${escapeHtml(sub || 'Video Game')}</div>
+            </div>
+            ${scoreTag}
+          </button>`;
+      })
+      .join('');
+
+    box.innerHTML = `
+      ${rowsHtml}
+      <button type="button" class="search-sugg-footer" data-sugg-search="${escapeHtml(clean)}">
+        <span>Search all PC, Console &amp; Online games for “${escapeHtml(clean)}”</span>
+        <span>↵</span>
+      </button>`;
+    box.classList.remove('hidden');
+  }
+
   async function runConciergeSearch(query, useAI = false) {
     const clean = query.trim();
     if (!clean) return;
+
+    closeSearchSuggestions();
+    if (state.searchAbortController) {
+      state.searchAbortController.abort();
+    }
+    const controller = new AbortController();
+    state.searchAbortController = controller;
 
     const seq = ++state.discoverSeq;
     switchView('discover', { skipAutoDiscover: true });
@@ -543,12 +656,29 @@
       }
       if (!useAI || !results.length) {
         state.discoverMode = 'search';
-        results = await API.searchGames(clean);
+        let renderedAny = false;
+        results = await API.searchGames(clean, {
+          signal: controller.signal,
+          onPartial: (partialItems, { isFinal }) => {
+            if (seq !== state.discoverSeq || controller.signal.aborted) return;
+            if (!partialItems.length && !isFinal) return;
+            renderedAny = true;
+            const suffix = isFinal ? '' : ' · searching more online…';
+            renderDiscoverGrid(partialItems, false, prefix, suffix);
+          }
+        });
+        if (seq !== state.discoverSeq || controller.signal.aborted) return;
+        if (!renderedAny || !results.length) {
+          renderDiscoverGrid(results, false, prefix);
+        } else {
+          renderDiscoverGrid(results, false, prefix);
+        }
+        return;
       }
-      if (seq !== state.discoverSeq) return;
+      if (seq !== state.discoverSeq || controller.signal.aborted) return;
       renderDiscoverGrid(results, false, prefix);
     } catch (err) {
-      if (seq !== state.discoverSeq) return;
+      if (seq !== state.discoverSeq || controller.signal.aborted) return;
       $('discoverGrid').innerHTML = `<div class="empty-state">Search failed: ${escapeHtml(err.message)}</div>`;
     }
   }
@@ -564,6 +694,14 @@
   }
 
   /* ---------- Game Cards & Multi-Tier Cover Fallbacks ---------- */
+  const SHORT_PLAT_LABELS = {
+    pc: 'PC',
+    playstation: 'PS',
+    xbox: 'Xbox',
+    nintendo: 'Switch',
+    deck: 'Deck'
+  };
+
   function buildCoverPlaceholderHTML(title, sub, extraClass = '') {
     return `
       <div class="poster-placeholder ${extraClass}">
@@ -672,17 +810,21 @@
     );
   }
 
-  function createCardHTML(item) {
+  function createCardHTML(item, { eager = false } = {}) {
     const saved = isInBacklog(item.id);
     const metaData = serializeBacklogPayload(item);
     const hasDeal = item.salePrice != null && item.savings > 0;
+    const platTags = (item.platforms || [])
+      .slice(0, 2)
+      .map((p) => `<span class="card-plat-chip">${escapeHtml(SHORT_PLAT_LABELS[p] || p)}</span>`)
+      .join('');
 
     return `
       <article class="media-card" data-action="open-detail" data-id="${escapeHtml(item.id)}" data-payload="${metaData}">
         <div class="poster-wrap">
           ${
             item.posterUrl
-              ? `<img src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" loading="lazy" decoding="async" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-sub="${escapeHtml(item.studio)}" />`
+              ? `<img src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" loading="${eager ? 'eager' : 'lazy'}"${eager ? ' fetchpriority="high"' : ''} decoding="async" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-sub="${escapeHtml(item.studio)}" />`
               : buildCoverPlaceholderHTML(item.displayTitle, item.studio)
           }
           ${
@@ -699,6 +841,10 @@
             data-payload="${metaData}"
             aria-label="Toggle Backlog"
           >${saved ? '✓' : '+'}</button>
+          <div class="card-hover-veil" aria-hidden="true">
+            <div class="card-plat-row">${platTags}</div>
+            <span class="card-inspect-pill">Inspect ↗</span>
+          </div>
         </div>
         <div class="card-body">
           <h3 class="card-title">${escapeHtml(item.displayTitle)}</h3>
@@ -1180,17 +1326,130 @@
       startHeroAutoRotate();
     });
 
-    // Search
+    // Search & Instant Type-Ahead Dropdown
+    const searchInput = $('conciergeInput');
+    const searchWrap = searchInput?.closest('.concierge-input-wrap');
+
     $('conciergeSearchForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      runConciergeSearch($('conciergeInput').value, false);
+      runConciergeSearch(searchInput.value, false);
     });
-    $('aiConciergeBtn').addEventListener('click', () => runConciergeSearch($('conciergeInput').value, true));
-    $('conciergeInput').addEventListener('input', (e) => $('clearSearchBtn').classList.toggle('hidden', !e.target.value));
+    $('aiConciergeBtn').addEventListener('click', () => runConciergeSearch(searchInput.value, true));
+
+    searchInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      $('clearSearchBtn').classList.toggle('hidden', !val);
+      searchWrap?.classList.toggle('has-text', Boolean(val));
+      renderSearchSuggestions(val);
+    });
+    searchInput.addEventListener('focus', () => {
+      if (searchInput.value.trim().length >= 2) {
+        renderSearchSuggestions(searchInput.value);
+      }
+    });
+    searchInput.addEventListener('keydown', (e) => {
+      const box = $('searchSuggestions');
+      if (!box || box.classList.contains('hidden')) return;
+      const items = [...box.querySelectorAll('.search-sugg-item, .search-sugg-footer')];
+      if (!items.length) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightSuggestion((state.suggIndex + 1) % items.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightSuggestion(state.suggIndex <= 0 ? items.length - 1 : state.suggIndex - 1);
+      } else if (e.key === 'Enter' && state.suggIndex >= 0 && items[state.suggIndex]) {
+        e.preventDefault();
+        items[state.suggIndex].click();
+      } else if (e.key === 'Escape') {
+        closeSearchSuggestions();
+      }
+    });
+
     $('clearSearchBtn').addEventListener('click', () => {
-      $('conciergeInput').value = '';
+      searchInput.value = '';
       $('clearSearchBtn').classList.add('hidden');
+      searchWrap?.classList.remove('has-text');
+      closeSearchSuggestions();
+      searchInput.focus();
     });
+
+    $('searchSuggestions')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const openBtn = e.target.closest('[data-sugg-open]');
+      if (openBtn) {
+        let fallback = null;
+        if (openBtn.dataset.payload) {
+          try { fallback = JSON.parse(decodeURIComponent(openBtn.dataset.payload)); } catch { /* ignore */ }
+        }
+        closeSearchSuggestions();
+        openDetailModal(openBtn.dataset.suggOpen, fallback);
+        return;
+      }
+      const searchBtn = e.target.closest('[data-sugg-search]');
+      if (searchBtn) {
+        runConciergeSearch(searchBtn.dataset.suggSearch, false);
+      }
+    });
+
+    searchWrap?.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => closeSearchSuggestions());
+
+    // Quick Explore Mood & Instant Filter Strip
+    $('quickExploreBar')?.addEventListener('click', (e) => {
+      const qBtn = e.target.closest('[data-quick-search]');
+      if (qBtn) {
+        const term = qBtn.dataset.quickSearch;
+        searchInput.value = term;
+        $('clearSearchBtn').classList.remove('hidden');
+        searchWrap?.classList.add('has-text');
+        runConciergeSearch(term, false);
+        return;
+      }
+      const fBtn = e.target.closest('[data-quick-filter]');
+      if (fBtn) {
+        const [kind, value] = String(fBtn.dataset.quickFilter || '').split(':');
+        resetFilterStateUI();
+        if (kind === 'budget' && value) {
+          state.filters.budget = value;
+          $('budgetPills').querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.budget === value));
+        } else if (kind === 'difficulty' && value) {
+          state.filters.difficulty = value;
+          $('difficultyPills').querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.difficulty === value));
+        }
+        syncFilterBadges();
+        switchView('discover', { skipAutoDiscover: true });
+        runDiscover(1, false);
+      }
+    });
+
+    // Shelf Whole-Page Carousel Controls
+    $('collectionsContainer')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-shelf-scroll]');
+      if (!btn) return;
+      const row = $(btn.dataset.shelfTarget);
+      if (!row) return;
+      const dir = Number(btn.dataset.shelfScroll) || 1;
+      const style = getComputedStyle(row);
+      const gap = parseFloat(style.columnGap || style.gap) || 16;
+      row.scrollBy({ left: dir * (row.clientWidth + gap), behavior: 'smooth' });
+    });
+
+    window.addEventListener('resize', () => {
+      document.querySelectorAll('.collection-row').forEach(syncShelfArrows);
+    }, { passive: true });
+
+    // Subtle GPU-Friendly Card Specular Hover Sheen
+    const trackCardSheen = (e) => {
+      const card = e.target.closest('.media-card');
+      if (!card) return;
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${Math.round(e.clientX - rect.left)}px`);
+      card.style.setProperty('--my', `${Math.round(e.clientY - rect.top)}px`);
+    };
+    $('homeView')?.addEventListener('pointermove', trackCardSheen, { passive: true });
+    $('discoverView')?.addEventListener('pointermove', trackCardSheen, { passive: true });
 
     // Delegated Card & Hero Actions
     document.addEventListener('click', async (e) => {
@@ -1478,7 +1737,7 @@
     $('applyFiltersBtn').addEventListener('click', () => runDiscover(1, false));
     $('loadMoreBtn').addEventListener('click', () => runDiscover(state.discoverPage + 1, true));
 
-    $('resetAllFiltersBtn').addEventListener('click', () => {
+    function resetFilterStateUI() {
       const currentSort = state.filters.sort;
       state.filters = createDefaultFilters();
       state.filters.sort = currentSort;
@@ -1502,6 +1761,10 @@
       syncEntityUI('studio');
       syncEntityUI('publisher');
       syncFilterBadges();
+    }
+
+    $('resetAllFiltersBtn').addEventListener('click', () => {
+      resetFilterStateUI();
       runDiscover(1, false);
     });
 
@@ -1600,12 +1863,36 @@
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return;
-      closeAllPopovers();
-      closeBriefingRoom();
-      $('detailModal').classList.add('hidden');
-      $('authModal').classList.add('hidden');
-      closeSettings();
+      const tag = (e.target?.tagName || '').toLowerCase();
+      const inField = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable;
+      const modalOpen =
+        !$('detailModal').classList.contains('hidden') ||
+        !$('briefingModal').classList.contains('hidden') ||
+        !$('authModal').classList.contains('hidden') ||
+        !$('settingsDrawer').classList.contains('hidden');
+
+      if (e.key === 'Escape') {
+        closeAllPopovers();
+        closeSearchSuggestions();
+        closeBriefingRoom();
+        $('detailModal').classList.add('hidden');
+        $('authModal').classList.add('hidden');
+        closeSettings();
+        return;
+      }
+
+      if (e.key === '/' && !inField && !modalOpen) {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        searchInput.focus();
+        searchInput.select();
+        return;
+      }
+
+      if (!inField && !modalOpen && state.view === 'home') {
+        if (e.key === 'ArrowRight') stepHero(1);
+        else if (e.key === 'ArrowLeft') stepHero(-1);
+      }
     });
   }
 
