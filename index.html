@@ -9,6 +9,9 @@
   <title>Would Play That — Curated Games Archive</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://shared.fastly.steamstatic.com" crossorigin />
+  <link rel="dns-prefetch" href="https://shared.fastly.steamstatic.com" />
+  <link rel="preconnect" href="https://www.cheapshark.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -462,6 +465,54 @@
               <span class="sub-label">Catalog &amp; Store Filters</span>
               <div class="pill-group" id="accessPills"></div>
             </div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 11. Price & Budget -->
+        <div class="filter-popover" data-filter-box="budget">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon ft-icon-price" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Price &amp; Budget</span>
+              <span class="ft-value" id="badge-budget">Any Price</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Price Tier &amp; Live Sales</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="budgetPills"></div>
+            <p class="helper-note">Combines curated price tiers with live CheapShark Steam deals.</p>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 12. Difficulty & Pace -->
+        <div class="filter-popover" data-filter-box="difficulty">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon ft-icon-diff" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Difficulty</span>
+              <span class="ft-value" id="badge-difficulty">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Challenge &amp; Intensity</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="difficultyPills"></div>
+            <p class="helper-note">Filter from cozy story evenings to punishing boss gauntlets.</p>
             <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
           </div>
         </div>
