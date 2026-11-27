@@ -463,7 +463,6 @@
 
   function renderDiscoverGrid(items, append = false, metaPrefix = '') {
     const grid = $('discoverGrid');
-    const isRatingSort = ['metacritic.desc', 'metacritic.asc', 'playerscore.desc', 'playerscore.asc'].includes(state.filters.sort);
 
     if (!append) state.currentResults = items;
     else {
@@ -480,8 +479,7 @@
       (state.discoverMode === 'search' || state.discoverMode === 'ai') &&
       state.filters.sort === 'popularity.desc';
     const displayList = API.sortAndSanitize(state.currentResults, state.filters.sort, preserveOrder);
-    const ratedNote = isRatingSort ? ' · unrated games hidden' : '';
-    $('resultsMeta').textContent = `${metaPrefix}${displayList.length} game${displayList.length === 1 ? '' : 's'}${ratedNote}`;
+    $('resultsMeta').textContent = `${metaPrefix}${displayList.length} game${displayList.length === 1 ? '' : 's'}`;
 
     if (!displayList.length) {
       grid.innerHTML = `<div class="empty-state">No games match that exact combination. Try switching an <strong>AND</strong> filter to <strong>OR</strong>, or tap an active chip above to remove it.</div>`;
@@ -526,12 +524,14 @@
     $('paginationBar').classList.add('hidden');
 
     if (useAI && !API.getGeminiKey()) {
-      showToast('Add a Gemini API Key in Settings for AI Discover. Searching live archive.');
+      showToast('Add a Gemini API Key in Settings for AI Discover. Searching online across PC & consoles.');
       useAI = false;
     }
 
     $('discoverGrid').innerHTML = createSkeletonCards(8);
-    $('resultsMeta').textContent = useAI ? '✦ Consulting Gemini Game Grounding…' : `Searching “${clean}”…`;
+    $('resultsMeta').textContent = useAI
+      ? '✦ Consulting Gemini Game Grounding…'
+      : `Searching online across PC, Console & Encyclopedia for “${clean}”…`;
 
     try {
       let results = [];
@@ -663,7 +663,11 @@
         hasMetacritic: Boolean(item.hasMetacritic),
         hasPlayerScore: Boolean(item.hasPlayerScore),
         awardBadge: item.awardBadge || '',
-        steamAppId: item.steamAppId || null
+        steamAppId: item.steamAppId || null,
+        wikiTitle: item.wikiTitle || '',
+        wikiUrl: item.wikiUrl || '',
+        overview: item.overview || '',
+        platforms: item.platforms || []
       })
     );
   }
