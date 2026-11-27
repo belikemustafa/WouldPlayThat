@@ -6,6 +6,7 @@
 window.WPT_CONFIG = {
   CHEAPSHARK_BASE: 'https://www.cheapshark.com/api/1.0',
   WIKI_SUMMARY_BASE: 'https://en.wikipedia.org/api/rest_v1/page/summary/',
+  WIKI_API_BASE: 'https://en.wikipedia.org/w/api.php',
   STEAM_ASSET_BASE: 'https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/',
   GEMINI_MODEL: 'gemini-2.5-flash',
   CACHE_TTL_MS: 1000 * 60 * 60 * 6,
@@ -17,7 +18,7 @@ window.WPT_CONFIG = {
     USERS: 'wpt_users_v1',
     ACTIVE_USER: 'wpt_active_user_v1',
     BACKLOG_PREFIX: 'wpt_backlog_',
-    CACHE_PREFIX: 'wpt_cache_v1_'
+    CACHE_PREFIX: 'wpt_cache_v2_'
   },
 
   THEMES: [
