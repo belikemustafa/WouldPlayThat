@@ -79,9 +79,10 @@ window.WPT_API = (() => {
     });
   }
 
-  /* ---------- Steam Asset URLs ---------- */
+  /* ---------- Fast Lightweight Steam Asset URLs ---------- */
   function steamPortraitUrl(appId) {
-    return appId ? `${CFG.STEAM_ASSET_BASE}${appId}/library_600x900_2x.jpg` : '';
+    // Standard 600x900 (~70KB vs ~600KB+ for _2x) — still >3x retina on 180px cards
+    return appId ? `${CFG.STEAM_ASSET_BASE}${appId}/library_600x900.jpg` : '';
   }
 
   function steamHeaderUrl(appId) {
@@ -89,7 +90,37 @@ window.WPT_API = (() => {
   }
 
   function steamHeroUrl(appId) {
-    return appId ? `${CFG.STEAM_ASSET_BASE}${appId}/library_hero.jpg` : '';
+    // 616x353 capsule (~55KB vs ~2MB library_hero.jpg) loads almost instantaneously
+    return appId ? `${CFG.STEAM_ASSET_BASE}${appId}/capsule_616x353.jpg` : '';
+  }
+
+  function inferDifficulty(raw) {
+    if (raw.difficulty) return raw.difficulty;
+    const genres = raw.genres || [];
+    const themes = raw.themes || [];
+    if (genres.includes('soulslike')) return 'punishing';
+    if (themes.includes('cozy')) return 'relaxed';
+    if (genres.includes('roguelike') || genres.includes('strategy') || genres.includes('horror') || genres.includes('metroidvania')) return 'challenging';
+    if (
+      genres.includes('narrative') &&
+      !genres.includes('action') &&
+      !genres.includes('action-adventure') &&
+      !genres.includes('shooter') &&
+      !genres.includes('platformer') &&
+      !genres.includes('rpg')
+    ) {
+      return 'relaxed';
+    }
+    return 'balanced';
+  }
+
+  function inferApproxPrice(raw) {
+    if (typeof raw.approxPrice === 'number') return raw.approxPrice;
+    const genres = raw.genres || [];
+    if (genres.includes('indie')) return 20;
+    if (Number(raw.year || 0) <= 2013) return 15;
+    if (Number(raw.year || 0) <= 2019) return 40;
+    return 60;
   }
 
   /* ---------- Normalization ---------- */
@@ -104,13 +135,15 @@ window.WPT_API = (() => {
     const fallbackUrl = raw.steamAppId ? steamHeaderUrl(raw.steamAppId) : '';
     const backdropUrl = raw.steamAppId
       ? steamHeroUrl(raw.steamAppId)
-      : wikiCache?.original || wikiCache?.thumbnail || '';
+      : wikiCache?.thumbnail || '';
 
     const normalized = {
       ...raw,
       displayTitle: raw.title,
       displayYear: raw.year ? String(raw.year) : '—',
       yearNum: Number(raw.year || 0),
+      difficulty: inferDifficulty(raw),
+      approxPrice: inferApproxPrice(raw),
       metacritic: typeof mc === 'number' && mc > 0 ? Math.round(mc) : null,
       playerScore: typeof ps === 'number' && ps > 0 ? Number(ps.toFixed(1)) : null,
       hasMetacritic: typeof mc === 'number' && mc > 0,
@@ -334,7 +367,7 @@ window.WPT_API = (() => {
     return getCuratedVault().filter((g) => g.featured).slice(0, 6);
   }
 
-  async function fetchLiveDeals({ page = 0, pageSize = 18, metacritic = 80, steamRating = 80, sortBy = 'Metacritic', title = '' } = {}) {
+  async function fetchLiveDeals({ page = 0, pageSize = 18, metacritic = 80, steamRating = 80, sortBy = 'Metacritic', title = '', upperPrice = null, onSale = false } = {}) {
     const url = new URL(`${CFG.CHEAPSHARK_BASE}/deals`);
     url.searchParams.set('storeID', '1'); // Steam
     url.searchParams.set('pageNumber', String(page));
@@ -343,16 +376,30 @@ window.WPT_API = (() => {
     if (metacritic > 0) url.searchParams.set('metacritic', String(metacritic));
     if (steamRating > 0) url.searchParams.set('steamRating', String(steamRating));
     if (title) url.searchParams.set('title', title);
+    if (upperPrice !== null && upperPrice !== undefined) url.searchParams.set('upperPrice', String(upperPrice));
+    if (onSale) url.searchParams.set('onSale', '1');
 
     const rows = await fetchJson(url.toString(), `cs_deals_${url.searchParams.toString()}`);
     if (!Array.isArray(rows)) return [];
     return dedupeGames(rows.map(normalizeCheapSharkDeal));
   }
 
+  async function hydrateWikiCover(game) {
+    if (!game || game.posterUrl || !game.wikiTitle) return '';
+    const wiki = await fetchWikiSummary(game.wikiTitle);
+    if (wiki?.thumbnail) {
+      game.posterUrl = wiki.thumbnail;
+      game.backdropUrl = wiki.thumbnail;
+      gameIndex.set(game.id, game);
+      return wiki.thumbnail;
+    }
+    return '';
+  }
+
   async function fetchCollection(col) {
     if (col.type === 'live_deals') {
       try {
-        const deals = await fetchLiveDeals({ page: 0, pageSize: 20, metacritic: 84, steamRating: 85, sortBy: 'Metacritic' });
+        const deals = await fetchLiveDeals({ page: 0, pageSize: 20, metacritic: 84, steamRating: 85, sortBy: 'Metacritic', onSale: true });
         if (deals.length) return deals.slice(0, 14);
       } catch {
         // graceful fallback to curated Steam games if CheapShark is temporarily unavailable
@@ -360,22 +407,8 @@ window.WPT_API = (() => {
       return getCuratedVault().filter((g) => g.steamAppId).slice(0, 14);
     }
 
-    const matched = getCuratedVault().filter(col.filter);
-    // Lazily enrich console exclusives lacking Steam covers with Wikipedia cover art
-    const consoleOnes = matched.filter((g) => !g.posterUrl && g.wikiTitle);
-    if (consoleOnes.length) {
-      await Promise.allSettled(
-        consoleOnes.slice(0, 4).map(async (g) => {
-          const wiki = await fetchWikiSummary(g.wikiTitle);
-          if (wiki?.thumbnail) {
-            g.posterUrl = wiki.thumbnail;
-            g.backdropUrl = wiki.original || wiki.thumbnail;
-            gameIndex.set(g.id, g);
-          }
-        })
-      );
-    }
-    return matched.slice(0, 14);
+    // Return immediately in 0ms (console-exclusive Wikipedia covers hydrate in the background)
+    return getCuratedVault().filter(col.filter).slice(0, 14);
   }
 
   /* ---------- Hybrid Live Search (Curated Vault + 40,000+ CheapShark Games) ---------- */
@@ -392,6 +425,7 @@ window.WPT_API = (() => {
         ...(g.genres || []),
         ...(g.themes || []),
         ...(g.platforms || []),
+        g.difficulty || '',
         g.awardBadge
       ]
         .join(' ')
@@ -412,7 +446,6 @@ window.WPT_API = (() => {
       });
       liveMatches = deals;
 
-      // Also hit /games?title=... if deals returned few items (catches games not currently listed in deals)
       if (liveMatches.length < 6) {
         const gUrl = `${CFG.CHEAPSHARK_BASE}/games?title=${encodeURIComponent(clean)}&limit=18`;
         const rows = await fetchJson(gUrl, `cs_games_${qLower}`);
@@ -439,7 +472,7 @@ window.WPT_API = (() => {
 
   /* ---------- Filter Studio Discovery ---------- */
   async function discoverWithFilters(filters, page = 1) {
-    const isLiveDealsOnly = filters.access.includes('deals');
+    const isLiveDealsOnly = filters.access.includes('deals') || filters.budget === 'onsale';
 
     // Curated Vault filtering (page 1)
     let results = [];
@@ -497,20 +530,29 @@ window.WPT_API = (() => {
         if (filters.access.includes('indie') && !g.genres.includes('indie') && !g.awards.includes('indie')) return false;
         if (filters.access.includes('deck') && !g.platforms.includes('deck')) return false;
 
+        // Budget filter
+        if (filters.budget === 'free' && g.approxPrice > 0) return false;
+        if (filters.budget === 'under10' && g.approxPrice > 10) return false;
+        if (filters.budget === 'under20' && g.approxPrice > 20) return false;
+        if (filters.budget === 'under40' && g.approxPrice > 40) return false;
+
+        // Difficulty filter
+        if (filters.difficulty && filters.difficulty !== 'all' && g.difficulty !== filters.difficulty) return false;
+
         return true;
       });
     }
 
-    // Live CheapShark augmentation when browsing Deals or loading page 2+ on PC / All Platforms
     const canFetchLiveDeals =
       isLiveDealsOnly ||
-      (page > 1 &&
+      ((page > 1 || ['under10', 'under20', 'under40'].includes(filters.budget)) &&
         (filters.platform === 'all' || filters.platform === 'pc') &&
         !filters.genres.length &&
         !filters.studios.length &&
         !filters.themes.length &&
         !filters.publishers.length &&
-        filters.awards === 'all');
+        filters.awards === 'all' &&
+        (!filters.difficulty || filters.difficulty === 'all'));
 
     let hasMoreLive =
       (filters.platform === 'all' || filters.platform === 'pc') &&
@@ -518,7 +560,8 @@ window.WPT_API = (() => {
       !filters.studios.length &&
       !filters.themes.length &&
       !filters.publishers.length &&
-      filters.awards === 'all';
+      filters.awards === 'all' &&
+      (!filters.difficulty || filters.difficulty === 'all');
 
     if (canFetchLiveDeals) {
       try {
@@ -529,33 +572,31 @@ window.WPT_API = (() => {
             ? 'Title'
             : 'Metacritic';
         const minSteamPct = filters.minPlayerScore > 0 ? Math.max(50, Math.round(((filters.minPlayerScore - 1) / 4) * 100)) : 75;
-        const livePage = isLiveDealsOnly ? page - 1 : page - 2;
+        const upperPrice =
+          filters.budget === 'free'
+            ? 0
+            : filters.budget === 'under10'
+            ? 10
+            : filters.budget === 'under20'
+            ? 20
+            : filters.budget === 'under40'
+            ? 40
+            : null;
+        const livePage = isLiveDealsOnly || upperPrice !== null ? page - 1 : page - 2;
         const live = await fetchLiveDeals({
           page: Math.max(0, livePage),
           pageSize: 24,
           metacritic: Math.max(filters.minMetacritic || 0, 72),
           steamRating: minSteamPct,
-          sortBy
+          sortBy,
+          upperPrice,
+          onSale: filters.budget === 'onsale'
         });
         results = dedupeGames([...results, ...live]);
         hasMoreLive = live.length >= 10;
       } catch {
         hasMoreLive = false;
       }
-    }
-
-    // Enrich console exclusive covers on page 1 if needed
-    const consoleMissing = results.filter((g) => !g.posterUrl && g.wikiTitle).slice(0, 5);
-    if (consoleMissing.length) {
-      await Promise.allSettled(
-        consoleMissing.map(async (g) => {
-          const wiki = await fetchWikiSummary(g.wikiTitle);
-          if (wiki?.thumbnail) {
-            g.posterUrl = wiki.thumbnail;
-            g.backdropUrl = wiki.original || wiki.thumbnail;
-          }
-        })
-      );
     }
 
     const sorted = sortAndSanitize(results, filters.sort);
@@ -678,6 +719,7 @@ Return ONLY JSON: {"metacritic": number|null, "playerScore": number|null, "award
     sortAndSanitize,
     fetchHeroSpotlight,
     fetchCollection,
+    hydrateWikiCover,
     fetchGameDetails,
     searchGames,
     discoverWithFilters,

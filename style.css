@@ -628,7 +628,7 @@ body.sheet-open .view-section.active { animation: none; }
 
 .filter-bar-shell {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.7rem;
   margin-bottom: 1.05rem;
 }
@@ -670,6 +670,8 @@ body.sheet-open .view-section.active { animation: none; }
 }
 .ft-icon-mc { color: #5bd48a; background: rgba(91, 212, 138, 0.14); }
 .ft-icon-user { color: #67c4f2; background: rgba(103, 196, 242, 0.14); }
+.ft-icon-price { color: #e2b857; background: rgba(226, 184, 87, 0.14); }
+.ft-icon-diff { color: #e07a68; background: rgba(224, 122, 104, 0.14); }
 
 .ft-labels { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 2px; }
 .ft-name {
@@ -715,8 +717,8 @@ body.sheet-open .view-section.active { animation: none; }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.filter-popover:nth-child(5n) .filter-panel,
-.filter-popover:nth-child(5n-1) .filter-panel {
+.filter-popover:nth-child(4n) .filter-panel,
+.filter-popover:nth-child(4n-1) .filter-panel {
   left: auto;
   right: 0;
 }
@@ -927,10 +929,18 @@ input[type="range"] { accent-color: var(--accent); cursor: pointer; height: 28px
 .poster-wrap {
   position: relative;
   aspect-ratio: 2 / 3;
-  background: var(--bg-elevated);
+  background: linear-gradient(110deg, var(--bg-surface) 25%, var(--bg-elevated) 45%, var(--bg-surface) 65%);
+  background-size: 220% 100%;
   overflow: hidden;
 }
-.poster-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 420ms ease; }
+.poster-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 220ms ease, transform 420ms ease;
+}
+.poster-wrap img.is-loaded { opacity: 1; }
 .media-card:hover .poster-wrap img { transform: scale(1.03); }
 
 /* Collector's Steelbook Fallback Cover */
@@ -1413,8 +1423,8 @@ input[type="range"] { accent-color: var(--accent); cursor: pointer; height: 28px
 /* ---------- Tablet & Phone First-Class Responsive ---------- */
 @media (max-width: 1120px) {
   .filter-bar-shell { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .filter-popover:nth-child(5n) .filter-panel,
-  .filter-popover:nth-child(5n-1) .filter-panel { left: 0; right: auto; }
+  .filter-popover:nth-child(4n) .filter-panel,
+  .filter-popover:nth-child(4n-1) .filter-panel { left: 0; right: auto; }
   .filter-popover:nth-child(3n) .filter-panel { left: auto; right: 0; }
 }
 

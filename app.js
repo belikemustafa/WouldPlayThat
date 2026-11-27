@@ -46,6 +46,8 @@
       awards: 'all',
       maxHours: 100,
       access: [],
+      budget: 'all',
+      difficulty: 'all',
       sort: 'popularity.desc'
     };
   }
@@ -175,6 +177,7 @@
             ? items.map((item) => createCardHTML(item)).join('')
             : `<div class="empty-state" style="min-width:260px;">No titles available for ${escapeHtml(col.title)}.</div>`;
           attachCoverFallbacks(row);
+          hydrateMissingCovers(row, items);
         })
         .catch(() => {
           const row = $(`col-row-${col.id}`);
@@ -196,7 +199,7 @@
           <div class="hero-box-wrap">
             ${
               item.posterUrl
-                ? `<img class="hero-box-art" src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-sub="${escapeHtml(item.studio)}" />`
+                ? `<img class="hero-box-art" src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" fetchpriority="high" decoding="async" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-sub="${escapeHtml(item.studio)}" />`
                 : buildCoverPlaceholderHTML(item.displayTitle, item.studio, 'hero-box-art')
             }
           </div>
@@ -280,6 +283,14 @@
 
     $('accessPills').innerHTML = CFG.ACCESS_OPTIONS.map(
       (opt) => `<button type="button" class="chip" data-access="${opt.id}">${escapeHtml(opt.label)}</button>`
+    ).join('');
+
+    $('budgetPills').innerHTML = CFG.BUDGET_PRESETS.map(
+      (b) => `<button type="button" class="chip ${b.id === 'all' ? 'active' : ''}" data-budget="${b.id}">${escapeHtml(b.label)}</button>`
+    ).join('');
+
+    $('difficultyPills').innerHTML = CFG.DIFFICULTY_PRESETS.map(
+      (d) => `<button type="button" class="chip ${d.id === 'all' ? 'active' : ''}" data-difficulty="${d.id}">${escapeHtml(d.label)}</button>`
     ).join('');
 
     syncFilterBadges();
@@ -373,6 +384,9 @@
     if (f.access.length) lenParts.push(`${f.access.length} filter${f.access.length > 1 ? 's' : ''}`);
     $('badge-length').textContent = lenParts.length ? lenParts.join(' · ') : 'Any';
 
+    $('badge-budget').textContent = CFG.BUDGET_PRESETS.find((b) => b.id === f.budget)?.label || 'Any Price';
+    $('badge-difficulty').textContent = CFG.DIFFICULTY_PRESETS.find((d) => d.id === f.difficulty)?.label || 'Any';
+
     setPopoverActive('platform', f.platform !== 'all' || Boolean(f.mode));
     setPopoverActive('genre', f.genres.length > 0);
     setPopoverActive('metacritic', f.minMetacritic > 0);
@@ -383,6 +397,8 @@
     setPopoverActive('era', Boolean(f.yearFrom || f.yearTo));
     setPopoverActive('awards', f.awards !== 'all');
     setPopoverActive('length', f.maxHours < 100 || f.access.length > 0);
+    setPopoverActive('budget', f.budget !== 'all');
+    setPopoverActive('difficulty', f.difficulty !== 'all');
 
     renderActiveFilterStrip();
   }
@@ -415,6 +431,8 @@
       const opt = CFG.ACCESS_OPTIONS.find((x) => x.id === id);
       if (opt) chips.push({ type: 'access', id, label: opt.label });
     });
+    if (f.budget !== 'all') chips.push({ type: 'budget', id: '', label: CFG.BUDGET_PRESETS.find((b) => b.id === f.budget)?.label || f.budget });
+    if (f.difficulty !== 'all') chips.push({ type: 'difficulty', id: '', label: CFG.DIFFICULTY_PRESETS.find((d) => d.id === f.difficulty)?.label || f.difficulty });
 
     const strip = $('activeFiltersStrip');
     if (!chips.length) {
@@ -472,6 +490,7 @@
 
     grid.innerHTML = displayList.map((item) => createCardHTML(item)).join('');
     attachCoverFallbacks(grid);
+    hydrateMissingCovers(grid, displayList);
   }
 
   async function runDiscover(page = 1, append = false) {
@@ -557,8 +576,18 @@
   function attachCoverFallbacks(rootEl) {
     if (!rootEl) return;
     rootEl.querySelectorAll('img[data-fallback-title]').forEach((img) => {
+      if (img.dataset.fallbackBound === '1') {
+        if (img.complete && img.naturalWidth > 0) img.classList.add('is-loaded');
+        return;
+      }
+      img.dataset.fallbackBound = '1';
+
       let triedSecondary = false;
       let swapped = false;
+
+      const markLoaded = () => {
+        if (img.naturalWidth > 0) img.classList.add('is-loaded');
+      };
 
       const swapToPlaceholder = () => {
         if (swapped || !img.parentNode) return;
@@ -582,8 +611,40 @@
         swapToPlaceholder();
       };
 
+      img.addEventListener('load', markLoaded);
       img.addEventListener('error', handleFailure);
-      if (img.complete && img.naturalWidth === 0) handleFailure();
+      if (img.complete) {
+        if (img.naturalWidth > 0) markLoaded();
+        else handleFailure();
+      }
+    });
+  }
+
+  function hydrateMissingCovers(rootEl, items) {
+    if (!rootEl || !Array.isArray(items) || typeof API.hydrateWikiCover !== 'function') return;
+    const missing = items.filter((it) => !it.posterUrl && it.wikiTitle);
+    if (!missing.length) return;
+
+    missing.forEach((item) => {
+      API.hydrateWikiCover(item)
+        .then((url) => {
+          if (!url || !rootEl.isConnected) return;
+          const card = rootEl.querySelector(`[data-id="${CSS.escape(item.id)}"]`);
+          const placeholder = card?.querySelector('.poster-wrap .poster-placeholder');
+          if (!card || !placeholder) return;
+
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = item.displayTitle;
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          img.dataset.fallbackSrc = item.fallbackPosterUrl || '';
+          img.dataset.fallbackTitle = item.displayTitle;
+          img.dataset.fallbackSub = item.studio || '';
+          placeholder.replaceWith(img);
+          attachCoverFallbacks(card);
+        })
+        .catch(() => {});
     });
   }
 
@@ -617,7 +678,7 @@
         <div class="poster-wrap">
           ${
             item.posterUrl
-              ? `<img src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" loading="lazy" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-sub="${escapeHtml(item.studio)}" />`
+              ? `<img src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" loading="lazy" decoding="async" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-sub="${escapeHtml(item.studio)}" />`
               : buildCoverPlaceholderHTML(item.displayTitle, item.studio)
           }
           ${
@@ -894,7 +955,7 @@
         <div class="poster-wrap">
           ${
             item.posterUrl
-              ? `<img src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-sub="${escapeHtml(item.studio)}" />`
+              ? `<img src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" loading="lazy" decoding="async" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-sub="${escapeHtml(item.studio)}" />`
               : buildCoverPlaceholderHTML(item.displayTitle, item.studio)
           }
           <button type="button" class="card-wl-btn ${item.completed ? 'saved' : ''}" data-action="toggle-completed" data-id="${escapeHtml(item.id)}" title="Mark Completed / To Play">
@@ -1331,6 +1392,12 @@
       } else if (type === 'access') {
         state.filters.access = state.filters.access.filter((a) => a !== id);
         $('accessPills').querySelector(`[data-access="${CSS.escape(id)}"]`)?.classList.remove('active');
+      } else if (type === 'budget') {
+        state.filters.budget = 'all';
+        $('budgetPills').querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.budget === 'all'));
+      } else if (type === 'difficulty') {
+        state.filters.difficulty = 'all';
+        $('difficultyPills').querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.difficulty === 'all'));
       }
       syncFilterBadges();
       runDiscover(1, false);
@@ -1378,6 +1445,24 @@
       syncFilterBadges();
     });
 
+    $('budgetPills').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-budget]');
+      if (!btn) return;
+      $('budgetPills').querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+      btn.classList.add('active');
+      state.filters.budget = btn.dataset.budget;
+      syncFilterBadges();
+    });
+
+    $('difficultyPills').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-difficulty]');
+      if (!btn) return;
+      $('difficultyPills').querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+      btn.classList.add('active');
+      state.filters.difficulty = btn.dataset.difficulty;
+      syncFilterBadges();
+    });
+
     // Sorter & Actions
     $('sorterQuickPills').addEventListener('click', (e) => {
       const btn = e.target.closest('[data-sort-val]');
@@ -1408,6 +1493,8 @@
       $('userScorePresets').querySelector('[data-us-preset="0"]')?.classList.add('active');
       $('eraPresets').querySelector('[data-era="all"]')?.classList.add('active');
       $('awardsPills').querySelector('[data-award="all"]')?.classList.add('active');
+      $('budgetPills').querySelector('[data-budget="all"]')?.classList.add('active');
+      $('difficultyPills').querySelector('[data-difficulty="all"]')?.classList.add('active');
       syncEntityUI('studio');
       syncEntityUI('publisher');
       syncFilterBadges();
