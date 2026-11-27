@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="abyssal-carbon" data-accent="royal-gold">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="description" content="Would Play That — Curated video games archive and precision game discovery studio with live Metacritic, Steam ratings, deals, and personal backlog." />
+  <meta name="theme-color" content="#0a0c0f" />
+  <title>Would Play That — Curated Games Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Ambient Archive Glow -->
+  <div class="ambient-vignette" aria-hidden="true"></div>
+
+  <!-- Top Editorial Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#home" class="brand-lockup" id="brandHomeBtn" aria-label="Would Play That Home">
+        <span class="brand-monogram" aria-hidden="true">
+          <svg viewBox="0 0 120 46" width="84" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2 H108 L118 12 V34 L108 44 H12 L2 34 V12 Z" stroke="currentColor" stroke-width="1.3" />
+            <path d="M15 6 H105 L113 14 V32 L105 40 H15 L7 32 V14 Z" stroke="currentColor" stroke-width="0.6" opacity="0.55" />
+            <polygon points="60,0 63,3 60,6 57,3" fill="currentColor" />
+            <polygon points="60,40 63,43 60,46 57,43" fill="currentColor" />
+            <text x="60" y="28.5" text-anchor="middle" fill="currentColor" font-family="Playfair Display, Georgia, serif" font-size="15.5" font-weight="600" letter-spacing="4">W·P·T</text>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-title">WOULD PLAY THAT</span>
+          <span class="brand-subtitle">CURATED GAMES ARCHIVE</span>
+        </span>
+      </a>
+
+      <!-- Desktop Navigation -->
+      <nav class="main-nav" aria-label="Primary Navigation">
+        <button class="nav-btn active" data-view="home">Home</button>
+        <button class="nav-btn" data-view="discover">Filter Studio</button>
+        <button class="nav-btn" data-view="backlog">
+          Backlog <span class="badge-pill" id="backlogCountBadge">0</span>
+        </button>
+      </nav>
+
+      <div class="header-actions">
+        <button class="icon-btn" id="openSettingsBtn" title="Appearance & Settings" aria-label="Studio Settings">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+
+        <div class="auth-header-group" id="guestAuthButtons">
+          <button class="btn-ghost btn-sm" id="headerLoginBtn">Log In</button>
+          <button class="btn-accent btn-sm" id="headerSignupBtn">Sign Up</button>
+        </div>
+
+        <button class="member-pill hidden" id="memberProfileBtn" title="Member Account">
+          <span class="member-avatar" id="memberAvatarInitial">P</span>
+          <span id="memberHandleLabel">@player</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Bottom Sheet Scrim -->
+  <div class="sheet-backdrop hidden" id="sheetBackdrop"></div>
+
+  <!-- Main Content -->
+  <main class="main-shell">
+    <!-- Concierge Game Search -->
+    <section class="search-bar-section">
+      <form id="conciergeSearchForm" class="concierge-form" autocomplete="off">
+        <div class="concierge-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            id="conciergeInput"
+            placeholder="Search any game, studio, or vibe (e.g. 'story-rich sci-fi RPG under 25h')…"
+          />
+          <button type="button" class="clear-search-btn hidden" id="clearSearchBtn" aria-label="Clear search">&times;</button>
+        </div>
+        <div class="concierge-actions">
+          <button type="submit" class="btn-accent">Search</button>
+          <button type="button" class="btn-outline" id="aiConciergeBtn" title="Gemini Search Grounding">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+            </svg>
+            AI Discover
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ==================== VIEW: HOME ==================== -->
+    <div id="homeView" class="view-section active">
+      <section class="hero-spotlight" id="heroSpotlight" aria-label="Featured Game Spotlight">
+        <svg class="deco-corner deco-tl" viewBox="0 0 40 40" width="30" height="30" fill="none" aria-hidden="true">
+          <path d="M2 38 V8 L8 2 H38 M8 38 V12 L12 8 H38" stroke="currentColor" stroke-width="1.1" />
+        </svg>
+        <svg class="deco-corner deco-tr" viewBox="0 0 40 40" width="30" height="30" fill="none" aria-hidden="true">
+          <path d="M38 38 V8 L32 2 H2 M32 38 V12 L28 8 H2" stroke="currentColor" stroke-width="1.1" />
+        </svg>
+
+        <div class="hero-track" id="heroTrack">
+          <div class="hero-skeleton shimmer">
+            <span>Curating Interactive Spotlight…</span>
+          </div>
+        </div>
+
+        <div class="hero-controls">
+          <button class="hero-arrow" id="heroPrevBtn" aria-label="Previous Game">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
+          <div class="hero-dots" id="heroDots"></div>
+          <button class="hero-arrow" id="heroNextBtn" aria-label="Next Game">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="hero-progress-track"><div class="hero-progress-bar" id="heroProgressBar"></div></div>
+      </section>
+
+      <!-- Ornamental Art Deco Controller Divider -->
+      <div class="editorial-divider" aria-hidden="true">
+        <span class="divider-line"></span>
+        <svg viewBox="0 0 64 18" width="56" height="16" fill="none">
+          <rect x="20" y="3" width="24" height="12" rx="6" stroke="currentColor" stroke-width="1.1" />
+          <path d="M26 9h4M28 7v4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+          <circle cx="37" cy="8" r="1.1" fill="currentColor" />
+          <circle cx="39.5" cy="10.2" r="1.1" fill="currentColor" />
+          <circle cx="8" cy="9" r="1.5" fill="currentColor" opacity="0.65" />
+          <circle cx="56" cy="9" r="1.5" fill="currentColor" opacity="0.65" />
+        </svg>
+        <span class="divider-line"></span>
+      </div>
+
+      <!-- Curated Game Collections -->
+      <section class="collections-wrapper" id="collectionsContainer"></section>
+    </div>
+
+    <!-- ==================== VIEW: FILTER STUDIO ==================== -->
+    <div id="discoverView" class="view-section">
+      <div class="section-header-bar">
+        <div>
+          <p class="eyebrow">PRECISION GAME DISCOVERY</p>
+          <h1 class="editorial-heading">The Game Filter Studio</h1>
+        </div>
+        <div class="studio-toolbar">
+          <button class="btn-ghost btn-sm" id="resetAllFiltersBtn">Reset</button>
+          <button class="btn-accent btn-sm" id="applyFiltersBtn">Apply Filters</button>
+        </div>
+      </div>
+
+      <!-- Large Touch-Optimized Game Filter Triggers (10 Controls) -->
+      <div class="filter-bar-shell" id="filterBarShell">
+        <!-- 1. Platform & Mode -->
+        <div class="filter-popover" data-filter-box="platform">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="6" width="20" height="12" rx="5"/><path d="M6 12h4M8 10v4"/><circle cx="15.5" cy="11" r="1"/><circle cx="18" cy="13" r="1"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Platform &amp; Mode</span>
+              <span class="ft-value" id="badge-platform">All · Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Platform &amp; Play Mode</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="panel-section">
+              <div class="pill-group" id="platformPills">
+                <button type="button" class="chip active" data-platform="all">All Platforms</button>
+                <button type="button" class="chip" data-platform="pc">PC / Steam</button>
+                <button type="button" class="chip" data-platform="playstation">PlayStation</button>
+                <button type="button" class="chip" data-platform="nintendo">Nintendo</button>
+                <button type="button" class="chip" data-platform="xbox">Xbox</button>
+                <button type="button" class="chip" data-platform="deck">Steam Deck</button>
+              </div>
+            </div>
+            <label class="field-row">
+              <span>Play Mode</span>
+              <select id="modeSelect"></select>
+            </label>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 2. Genre (with AND / OR) -->
+        <div class="filter-popover" data-filter-box="genre">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Genre</span>
+              <span class="ft-value" id="badge-genre">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel filter-panel-wide hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Genres</span>
+              <div class="logic-switch" data-logic-toggle="genre" role="group" aria-label="Genre match logic">
+                <button type="button" class="logic-btn active" data-logic-val="AND">AND</button>
+                <button type="button" class="logic-btn" data-logic-val="OR">OR</button>
+              </div>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <p class="helper-note" id="genreLogicHint">Matching games that span <strong>all</strong> selected genres.</p>
+            <div class="pill-group" id="genrePills"></div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 3. Metacritic Rating -->
+        <div class="filter-popover" data-filter-box="metacritic">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon ft-icon-mc" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 15V9l4 4 4-4v6"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Metacritic</span>
+              <span class="ft-value" id="badge-metacritic">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Minimum Metacritic (/100)</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="mcPresets">
+              <button type="button" class="chip active" data-mc-preset="0">Any</button>
+              <button type="button" class="chip" data-mc-preset="75">75+</button>
+              <button type="button" class="chip" data-mc-preset="80">80+</button>
+              <button type="button" class="chip" data-mc-preset="85">85+</button>
+              <button type="button" class="chip" data-mc-preset="90">90+</button>
+              <button type="button" class="chip" data-mc-preset="94">94+</button>
+            </div>
+            <label class="field-row">
+              <span>Fine-Tune: <strong id="minMcVal">Any</strong></span>
+              <input type="range" id="minMcRange" min="0" max="96" step="1" value="0" />
+            </label>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 4. Player / Steam Rating -->
+        <div class="filter-popover" data-filter-box="playerscore">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon ft-icon-user" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M12 2.5l2.85 5.77 6.37.93-4.61 4.49 1.09 6.35L12 17.04l-5.7 3 1.09-6.35-4.61-4.49 6.37-.93L12 2.5z"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Player Score</span>
+              <span class="ft-value" id="badge-playerscore">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Minimum Player Rating (/5★)</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="userScorePresets">
+              <button type="button" class="chip active" data-us-preset="0">Any</button>
+              <button type="button" class="chip" data-us-preset="3.8">3.8★+</button>
+              <button type="button" class="chip" data-us-preset="4.0">4.0★+</button>
+              <button type="button" class="chip" data-us-preset="4.3">4.3★+</button>
+              <button type="button" class="chip" data-us-preset="4.5">4.5★+</button>
+              <button type="button" class="chip" data-us-preset="4.7">4.7★+</button>
+            </div>
+            <label class="field-row">
+              <span>Fine-Tune: <strong id="minUsVal">Any</strong></span>
+              <input type="range" id="minUsRange" min="0" max="4.9" step="0.1" value="0" />
+            </label>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 5. Studios / Developers (with AND / OR) -->
+        <div class="filter-popover" data-filter-box="studio">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Studios</span>
+              <span class="ft-value" id="badge-studio">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel filter-panel-wide hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Developers &amp; Studios</span>
+              <div class="logic-switch" data-logic-toggle="studio" role="group" aria-label="Studio match logic">
+                <button type="button" class="logic-btn" data-logic-val="AND">AND</button>
+                <button type="button" class="logic-btn active" data-logic-val="OR">OR</button>
+              </div>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <p class="helper-note" id="studioLogicHint">Tap a studio to select, or tap again to deselect. <strong>OR</strong> shows games by any selected studio.</p>
+            <div class="autocomplete-wrap">
+              <input type="text" id="studioSearchInput" placeholder="Add studio & press Enter (e.g. FromSoftware)…" />
+            </div>
+            <div class="selected-tags" id="selectedStudioTags"></div>
+            <div class="panel-section">
+              <span class="sub-label">Essential Studios</span>
+              <div class="pill-group" id="studioPresets"></div>
+            </div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 6. Vibe & Perspective (with AND / OR) -->
+        <div class="filter-popover" data-filter-box="theme">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Vibe &amp; View</span>
+              <span class="ft-value" id="badge-theme">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel filter-panel-wide hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Themes &amp; Perspective</span>
+              <div class="logic-switch" data-logic-toggle="theme" role="group" aria-label="Theme match logic">
+                <button type="button" class="logic-btn active" data-logic-val="AND">AND</button>
+                <button type="button" class="logic-btn" data-logic-val="OR">OR</button>
+              </div>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <p class="helper-note" id="themeLogicHint">Finding games combining <strong>all</strong> selected themes.</p>
+            <div class="pill-group" id="themePills"></div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 7. Publishers (with AND / OR) -->
+        <div class="filter-popover" data-filter-box="publisher">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Publishers</span>
+              <span class="ft-value" id="badge-publisher">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel filter-panel-wide hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Publishers &amp; Labels</span>
+              <div class="logic-switch" data-logic-toggle="publisher" role="group" aria-label="Publisher match logic">
+                <button type="button" class="logic-btn" data-logic-val="AND">AND</button>
+                <button type="button" class="logic-btn active" data-logic-val="OR">OR</button>
+              </div>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="publisherPresets"></div>
+            <div class="autocomplete-wrap">
+              <input type="text" id="publisherSearchInput" placeholder="Add publisher & press Enter (e.g. Capcom)…" />
+            </div>
+            <div class="selected-tags" id="selectedPublisherTags"></div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 8. Release Era & Year -->
+        <div class="filter-popover" data-filter-box="era">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Era &amp; Year</span>
+              <span class="ft-value" id="badge-era">All Eras</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Release Era</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="eraPresets"></div>
+            <div class="year-range-row">
+              <input type="number" id="yearFromInput" placeholder="From (1985)" min="1975" max="2026" />
+              <span>–</span>
+              <input type="number" id="yearToInput" placeholder="To (2026)" min="1975" max="2026" />
+            </div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 9. Game Awards & Honors -->
+        <div class="filter-popover" data-filter-box="awards">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9c-2 2-2 7 2 10M18 9c2 2 2 7-2 10"/><circle cx="12" cy="10" r="4"/><path d="M9 19h6"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Game Awards</span>
+              <span class="ft-value" id="badge-awards">All Games</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Prestigious Game Honors</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="awardsPills"></div>
+            <p class="helper-note">Verified Game of the Year, BAFTA, D.I.C.E., and Indie honorees.</p>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+
+        <!-- 10. Playtime & Store Access -->
+        <div class="filter-popover" data-filter-box="length">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Length &amp; Deals</span>
+              <span class="ft-value" id="badge-length">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Main Story Length &amp; Deals</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <label class="field-row">
+              <span>Max Main Story: <strong id="maxHoursVal">Any</strong></span>
+              <input type="range" id="maxHoursRange" min="5" max="100" step="5" value="100" />
+            </label>
+            <div class="panel-section">
+              <span class="sub-label">Catalog &amp; Store Filters</span>
+              <div class="pill-group" id="accessPills"></div>
+            </div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Games</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Filter Chips -->
+      <div class="active-filters-strip hidden" id="activeFiltersStrip"></div>
+
+      <!-- Formal Sorter & Results Meta Bar -->
+      <div class="results-toolbar">
+        <div class="results-meta" id="resultsMeta">Interactive archive ready.</div>
+
+        <div class="sorter-shell" aria-label="Sort Games">
+          <div class="sorter-quick-pills" id="sorterQuickPills">
+            <button type="button" class="sort-pill active" data-sort-val="popularity.desc">Popular</button>
+            <button type="button" class="sort-pill" data-sort-val="metacritic.desc">Metacritic</button>
+            <button type="button" class="sort-pill" data-sort-val="playerscore.desc">Player ★</button>
+            <button type="button" class="sort-pill" data-sort-val="year.desc">Newest</button>
+          </div>
+          <select id="sortSelect" aria-label="Full Sort Options">
+            <option value="popularity.desc">Sort: Most Acclaimed &amp; Popular</option>
+            <option value="metacritic.desc">Sort: Metacritic (High → Low)</option>
+            <option value="metacritic.asc">Sort: Metacritic (Low → High)</option>
+            <option value="playerscore.desc">Sort: Player Score (High → Low)</option>
+            <option value="playerscore.asc">Sort: Player Score (Low → High)</option>
+            <option value="year.desc">Sort: Release Year (Newest)</option>
+            <option value="year.asc">Sort: Classic First (Oldest)</option>
+            <option value="hours.asc">Sort: Playtime (Shortest First)</option>
+            <option value="title.asc">Sort: Title (A → Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Discovery Grid -->
+      <div class="media-grid" id="discoverGrid"></div>
+
+      <div class="pagination-bar hidden" id="paginationBar">
+        <button class="btn-outline" id="loadMoreBtn">Load More Live Deals</button>
+      </div>
+    </div>
+
+    <!-- ==================== VIEW: BACKLOG ==================== -->
+    <div id="backlogView" class="view-section">
+      <div class="section-header-bar">
+        <div>
+          <p class="eyebrow">PERSONAL VAULT</p>
+          <h1 class="editorial-heading" id="backlogHeading">Your Game Backlog</h1>
+        </div>
+        <div class="studio-toolbar">
+          <div class="pill-group" id="backlogFilterPills">
+            <button class="chip active" data-backlog-filter="all">All Saved</button>
+            <button class="chip" data-backlog-filter="toplay">To Play</button>
+            <button class="chip" data-backlog-filter="completed">Completed</button>
+          </div>
+          <button class="btn-outline btn-sm" id="exportBacklogBtn">Export</button>
+          <label class="btn-outline btn-sm file-label">
+            Import
+            <input type="file" id="importBacklogInput" accept="application/json" hidden />
+          </label>
+        </div>
+      </div>
+      <div class="media-grid" id="backlogGrid"></div>
+    </div>
+  </main>
+
+  <!-- ==================== MOBILE FLOATING BOTTOM DOCK ==================== -->
+  <nav class="mobile-dock" aria-label="Mobile Navigation">
+    <button type="button" class="dock-btn active" data-mobile-nav="home">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z"/></svg>
+      <span>Home</span>
+    </button>
+    <button type="button" class="dock-btn" data-mobile-nav="discover">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+      <span>Filters</span>
+    </button>
+    <button type="button" class="dock-btn" data-mobile-nav="search">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <span>Search</span>
+    </button>
+    <button type="button" class="dock-btn" data-mobile-nav="backlog">
+      <span class="dock-icon-wrap">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 4h12a1 1 0 0 1 1 1v16l-7-4-7 4V5a1 1 0 0 1 1-1z"/></svg>
+        <span class="dock-badge" id="mobileBacklogBadge">0</span>
+      </span>
+      <span>Backlog</span>
+    </button>
+  </nav>
+
+  <!-- ==================== GAME DOSSIER MODAL ==================== -->
+  <div class="modal-backdrop hidden" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="modal-dialog detail-dialog">
+      <button class="modal-close-btn" id="closeDetailModalBtn" aria-label="Close game details">&times;</button>
+      <div id="detailModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ==================== TRAILER / BRIEFING ROOM MODAL ==================== -->
+  <div class="modal-backdrop hidden" id="briefingModal" role="dialog" aria-modal="true" aria-label="Game Briefing Room">
+    <div class="modal-dialog reader-dialog">
+      <div class="reader-topbar">
+        <div>
+          <span class="eyebrow">GAME BRIEFING</span>
+          <h3 id="briefingTitleText">Official Spotlight</h3>
+        </div>
+        <div class="reader-topbar-actions">
+          <a id="briefingTrailerLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-outline btn-sm">Watch Trailer ↗</a>
+          <button class="modal-close-inline" id="closeBriefingModalBtn" aria-label="Close briefing">&times;</button>
+        </div>
+      </div>
+      <div class="reader-stage" id="briefingStage"></div>
+    </div>
+  </div>
+
+  <!-- ==================== SETTINGS DRAWER ==================== -->
+  <div class="drawer-backdrop hidden" id="settingsDrawer">
+    <aside class="settings-panel" aria-label="Studio Settings">
+      <div class="drawer-header">
+        <div>
+          <span class="eyebrow">PREFERENCES</span>
+          <h2>Studio Settings</h2>
+        </div>
+        <button class="modal-close-inline" id="closeSettingsBtn" aria-label="Close settings">&times;</button>
+      </div>
+
+      <div class="drawer-content">
+        <div class="settings-group">
+          <h3>Dark Surface</h3>
+          <div class="swatch-grid" id="themeSelectorGrid"></div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Formal Accent</h3>
+          <div class="accent-grid" id="accentSelectorGrid"></div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Data &amp; AI Enhancement</h3>
+          <p class="helper-note">Live PC game search &amp; deals load via <strong>CheapShark</strong> &amp; <strong>Wikipedia</strong> with no API key required. Add an optional Gemini key below for <strong>AI Discover</strong> and Search-grounded Metacritic &amp; Game Awards verification.</p>
+          <label class="field-row">
+            <span>Google Gemini API Key (Optional)</span>
+            <input type="password" id="geminiKeyInput" placeholder="Enter Gemini API Key…" autocomplete="off" />
+          </label>
+          <div class="settings-btn-row">
+            <button class="btn-accent btn-sm" id="saveApiKeysBtn">Save Settings</button>
+            <button class="btn-outline btn-sm" id="clearCacheBtn">Clear Cache</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ==================== MEMBER AUTH MODAL ==================== -->
+  <div class="modal-backdrop hidden" id="authModal" role="dialog" aria-modal="true" aria-label="Member Authentication">
+    <div class="modal-dialog auth-dialog">
+      <button class="modal-close-btn" id="closeAuthModalBtn" aria-label="Close">&times;</button>
+      <div class="auth-crest" aria-hidden="true">
+        <svg viewBox="0 0 64 32" width="52" height="26" fill="none">
+          <path d="M8 2 H56 L62 16 L56 30 H8 L2 16 Z" stroke="currentColor" stroke-width="1.2" />
+          <text x="32" y="20.5" text-anchor="middle" fill="currentColor" font-family="Playfair Display, Georgia, serif" font-size="11" font-weight="600" letter-spacing="2">W·P·T</text>
+        </svg>
+      </div>
+
+      <div class="auth-header">
+        <span class="eyebrow">MEMBER VAULT</span>
+        <h2 id="authModalTitle">Log In to Would Play That</h2>
+        <p class="helper-note">Passwords are salted &amp; SHA-256 hashed locally. Each player keeps a private game backlog.</p>
+      </div>
+
+      <div class="auth-tabs" id="authTabs">
+        <button type="button" class="auth-tab active" data-auth-mode="login">Log In</button>
+        <button type="button" class="auth-tab" data-auth-mode="signup">Sign Up</button>
+      </div>
+
+      <form id="authForm" class="form-stack">
+        <label class="field-row hidden" id="authDisplayNameRow">
+          <span>Display Name</span>
+          <input type="text" id="authDisplayName" placeholder="e.g. Mustafa" autocomplete="name" />
+        </label>
+        <label class="field-row">
+          <span>Username</span>
+          <input type="text" id="authUsername" required minlength="3" placeholder="e.g. completionist" autocomplete="username" />
+        </label>
+        <label class="field-row">
+          <span>Password</span>
+          <input type="password" id="authPassword" required minlength="4" placeholder="••••••••" autocomplete="current-password" />
+        </label>
+        <label class="field-row hidden" id="authConfirmRow">
+          <span>Confirm Password</span>
+          <input type="password" id="authConfirmPassword" placeholder="••••••••" autocomplete="new-password" />
+        </label>
+        <p class="auth-error hidden" id="authErrorText"></p>
+        <button type="submit" class="btn-accent" id="authSubmitBtn">Log In</button>
+      </form>
+
+      <div id="signedInPanel" class="hidden signed-in-panel">
+        <div>
+          <span class="eyebrow">ACTIVE PLAYER</span>
+          <div class="signed-in-name" id="signedInUserLabel"></div>
+          <div class="helper-note" id="signedInStats"></div>
+        </div>
+        <button class="btn-outline btn-sm" id="logoutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast hidden" id="toastEl" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
