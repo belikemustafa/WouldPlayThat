@@ -18,7 +18,7 @@ window.WPT_CONFIG = {
     USERS: 'wpt_users_v1',
     ACTIVE_USER: 'wpt_active_user_v1',
     BACKLOG_PREFIX: 'wpt_backlog_',
-    CACHE_PREFIX: 'wpt_cache_v2_'
+    CACHE_PREFIX: 'wpt_cache_v3_'
   },
 
   THEMES: [

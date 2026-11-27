@@ -87,8 +87,12 @@
             type="text"
             id="conciergeInput"
             placeholder="Search any video game online (PC, PlayStation, Xbox, Nintendo, Mobile, Retro)…"
+            aria-autocomplete="list"
+            aria-controls="searchSuggestions"
           />
+          <kbd class="search-kbd-hint" aria-hidden="true">/</kbd>
           <button type="button" class="clear-search-btn hidden" id="clearSearchBtn" aria-label="Clear search">&times;</button>
+          <div class="search-suggestions hidden" id="searchSuggestions" role="listbox" aria-label="Instant game suggestions"></div>
         </div>
         <div class="concierge-actions">
           <button type="submit" class="btn-accent">Search</button>
@@ -100,6 +104,17 @@
           </button>
         </div>
       </form>
+      <div class="quick-explore-bar" id="quickExploreBar" aria-label="Quick Explore">
+        <span class="quick-explore-label">Explore</span>
+        <button type="button" class="quick-pill" data-quick-search="Minecraft">Minecraft</button>
+        <button type="button" class="quick-pill" data-quick-search="Grand Theft Auto">GTA</button>
+        <button type="button" class="quick-pill" data-quick-search="The Legend of Zelda">Zelda</button>
+        <button type="button" class="quick-pill" data-quick-search="Valorant">Valorant</button>
+        <button type="button" class="quick-pill" data-quick-filter="budget:free">Free to Play</button>
+        <button type="button" class="quick-pill" data-quick-filter="budget:under10">Under $10</button>
+        <button type="button" class="quick-pill" data-quick-filter="difficulty:relaxed">Cozy &amp; Relaxed</button>
+        <button type="button" class="quick-pill" data-quick-filter="difficulty:punishing">Soulslike &amp; Hardcore</button>
+      </div>
     </section>
 
     <!-- ==================== VIEW: HOME ==================== -->
